@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+const (
+	MaxReadSocketLength = 1096
+)
+
 // transport represents the transport layer data
 type transport struct {
 	network      string
@@ -77,7 +81,7 @@ func (t *transport) read() (string, error) {
 	logDebug("Dumping messages received from the server...")
 
 	for {
-		tmp := make([]byte, 1096)
+		tmp := make([]byte, MaxReadSocketLength)
 
 		n, err := t.sckt.Read(tmp)
 
@@ -95,6 +99,10 @@ func (t *transport) read() (string, error) {
 		}
 
 		data = append(data, tmp[:n]...)
+		if n < MaxReadSocketLength {
+			logDebug("Read everything from socket")
+			break
+		}
 		if string(data) == icap100ContinueMsg { // explicitly breaking because the Read blocks for 100 continue message // TODO: find out why
 			logDebug("Stopping because got 100 Continue from the server")
 			break
