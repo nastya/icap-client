@@ -31,7 +31,7 @@ const (
 	CRLF                            = "\r\n"
 	DoubleCRLF                      = "\r\n\r\n"
 	LF                              = "\n"
-	bodyEndIndicator                = CRLF + "0" + DoubleCRLF
+	bodyEndIndicator                = "0" + DoubleCRLF
 	fullBodyEndIndicatorPreviewMode = "; ieof" + DoubleCRLF
 	icap100ContinueMsg              = "ICAP/1.0 100 Continue" + DoubleCRLF
 	icap204NoModsMsg                = "ICAP/1.0 204 No modifications"

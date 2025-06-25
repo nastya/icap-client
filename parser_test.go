@@ -194,7 +194,11 @@ func TestParser(t *testing.T) {
 		}
 
 		for _, sample := range sampleTable {
-			parsePreviewBodyBytes(&sample.httpMsg, sample.previewBytes)
+			headerStr, bodyStr := splitBodyAndHeader(sample.httpMsg)
+			if sample.previewBytes < len(bodyStr) {
+				bodyStr = bodyStr[:sample.previewBytes]
+			}
+			mergeHeaderAndBody(&sample.httpMsg, headerStr, bodyStr)
 			if sample.httpMsg != sample.result {
 				t.Logf("Wanted http message after parsing to be: %s , got: %s", sample.result, sample.httpMsg)
 				t.Fail()

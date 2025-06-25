@@ -103,9 +103,10 @@ func DumpRequest(req *Request, setAbsoluteUrl bool) ([]byte, error) {
 		}
 
 		httpReqStr = string(b)
+		headerStr, bodyStr := splitBodyAndHeader(httpReqStr)
 		if setAbsoluteUrl {
-			partsHttp := strings.SplitN(httpReqStr, "\n", 2)
-			if len(partsHttp) < 2 {
+			partsHttp := strings.SplitN(headerStr, "\n", 2)
+			if len(partsHttp) < 1 {
 				return []byte{}, fmt.Errorf("Failed to parse dumped HTTPRequest: %s", httpReqStr)
 			}
 			headerLineParts := strings.Split(partsHttp[0], " ")
@@ -113,28 +114,24 @@ func DumpRequest(req *Request, setAbsoluteUrl bool) ([]byte, error) {
 				return []byte{}, fmt.Errorf("Incorrect HTTP header line: %s", partsHttp[0])
 			}
 			newHeaderLine := headerLineParts[0] + " " + req.HTTPRequest.URL.String() + " " + headerLineParts[2]
-			httpReqStr = newHeaderLine + "\n" + partsHttp[1]
+			headerStr = newHeaderLine + "\n" + partsHttp[1]
 		}
 
 		if req.Method == MethodREQMOD {
-			if req.previewSet {
-				parsePreviewBodyBytes(&httpReqStr, req.PreviewBytes)
+			if req.previewSet && req.PreviewBytes < len(bodyStr) {
+				bodyStr = bodyStr[:req.PreviewBytes]
 			}
 
-			if !bodyAlreadyChunked(httpReqStr) {
-				headerStr, bodyStr, ok := splitBodyAndHeader(httpReqStr)
-				if ok {
+			if !bodyAlreadyChunked(bodyStr) {
+				if bodyStr != "" || req.previewSet && req.PreviewBytes == 0 {
 					addHexaBodyByteNotations(&bodyStr)
-					mergeHeaderAndBody(&httpReqStr, headerStr, bodyStr)
 				}
 			}
 
 		} else { // In case of RESPMOD we send only header (see https://datatracker.ietf.org/doc/html/rfc3507#section-4.9.1)
-			headerStr, _, ok := splitBodyAndHeader(httpReqStr)
-			if ok {
-				httpReqStr = headerStr
-			}
+			bodyStr = ""
 		}
+		mergeHeaderAndBody(&httpReqStr, headerStr, bodyStr)
 
 		if httpReqStr != "" { // if the HTTP Request message block doesn't end with a \r\n\r\n, then going to add one by force for better calculation of byte offsets
 			for !strings.HasSuffix(httpReqStr, DoubleCRLF) {
@@ -155,29 +152,27 @@ func DumpRequest(req *Request, setAbsoluteUrl bool) ([]byte, error) {
 			return nil, err
 		}
 
-		httpRespStr += string(b)
+		httpRespStr = string(b)
+		headerStr, bodyStr := splitBodyAndHeader(httpRespStr)
 
-		if req.previewSet {
-			parsePreviewBodyBytes(&httpRespStr, req.PreviewBytes)
+		if req.previewSet && req.PreviewBytes < len(bodyStr) {
+			bodyStr = bodyStr[:req.PreviewBytes]
 		}
 
-		if !bodyAlreadyChunked(httpRespStr) {
-			headerStr, bodyStr, ok := splitBodyAndHeader(httpRespStr)
-			if ok {
+		if !bodyAlreadyChunked(bodyStr) {
+			if bodyStr != "" || req.previewSet && req.PreviewBytes == 0 {
 				addHexaBodyByteNotations(&bodyStr)
-				mergeHeaderAndBody(&httpRespStr, headerStr, bodyStr)
 			}
 		}
-
+		mergeHeaderAndBody(&httpRespStr, headerStr, bodyStr)
 		if httpRespStr != "" && !strings.HasSuffix(httpRespStr, DoubleCRLF) { // if the HTTP Response message block doesn't end with a \r\n\r\n, then going to add one by force for better calculation of byte offsets
 			httpRespStr = trimAllSuffixes(httpRespStr, CRLF)
 			httpRespStr += DoubleCRLF
 		}
-
 	}
 
 	if encpVal := req.Header.Get(EncapsulatedHeader); encpVal != "" {
-		reqStr = fmt.Sprintf(reqStr, encpVal)
+		reqStr = fmt.Sprintf(reqStr, encpVal) // TODO what is it for?
 	} else {
 		//populating the Encapsulated header of the ICAP message portion
 		setEncapsulatedHeaderValue(&reqStr, httpReqStr, httpRespStr)

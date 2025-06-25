@@ -117,44 +117,28 @@ func addFullBodyInPreviewIndicator(str *string) {
 }
 
 // splitBodyAndHeader separates header and body from a http message
-func splitBodyAndHeader(str string) (string, string, bool) {
+func splitBodyAndHeader(str string) (headerStr string, bodyStr string) {
 	ss := strings.SplitN(str, DoubleCRLF, 2)
 
-	if len(ss) < 2 || ss[1] == "" {
-		return "", "", false
+	if len(ss) >= 1 {
+		headerStr = ss[0]
 	}
 
-	headerStr := ss[0]
-	bodyStr := ss[1]
-
-	return headerStr, bodyStr, true
+	if len(ss) == 2 {
+		bodyStr = ss[1]
+	}
+	return
 }
 
 // bodyAlreadyChunked determines if the http body is already chunked from the origin server or not
-func bodyAlreadyChunked(str string) bool {
-	_, bodyStr, ok := splitBodyAndHeader(str)
-
-	if !ok {
+func bodyAlreadyChunked(bodyStr string) bool {
+	if bodyStr == "" {
 		return false
 	}
 
 	r := regexp.MustCompile("\\r\\n0(\\r\\n)+$")
 	return r.MatchString(bodyStr)
 
-}
-
-// parsePreviewBodyBytes parses the preview portion of the body and only keeps that in the message
-func parsePreviewBodyBytes(str *string, pb int) {
-
-	headerStr, bodyStr, ok := splitBodyAndHeader(*str)
-
-	if !ok {
-		return
-	}
-
-	bodyStr = bodyStr[:pb]
-
-	*str = headerStr + DoubleCRLF + bodyStr
 }
 
 // addHexaBodyByteNotations adds the hexadecimal byte notaions in the messages
@@ -166,7 +150,11 @@ func addHexaBodyByteNotations(bodyStr *string) {
 
 	bodyBytes := []byte(*bodyStr)
 
-	*bodyStr = fmt.Sprintf("%x%s%s%s", len(bodyBytes), CRLF, *bodyStr, bodyEndIndicator)
+	if *bodyStr == "" {
+		*bodyStr = bodyEndIndicator
+		return
+	}
+	*bodyStr = fmt.Sprintf("%x%s%s%s%s", len(bodyBytes), CRLF, *bodyStr, CRLF, bodyEndIndicator)
 }
 
 // mergeHeaderAndBody merges the header and body of the http message togather
